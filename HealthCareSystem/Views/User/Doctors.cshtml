@@ -1,0 +1,193 @@
+﻿@{
+    Layout = "_LayoutUser";
+    ViewData["Title"] = "List of doctors";
+}
+<!-- Main Content -->
+<div class="main-content">
+    <!-- Header -->
+    <header class="header">
+        <h1 class="header-title">
+            Available Doctors
+        </h1>
+        <div class="search-container">
+            <i class="fas fa-search search-icon"></i>
+            <input type="text" class="search-input" placeholder="Find a doctor or specialist..." id="searchInput">
+        </div>
+        <div class="header-actions">
+            <button class="notification-btn">
+                <i class="fas fa-bell"></i>
+                <span class="notification-badge">3</span>
+            </button>
+            <a asp-action="Profile" asp-controller="User" style="text-decoration: none;">
+                <div class="user-profile">
+                    <img src="@(ViewBag.CurrentUser?.AvatarUrl ?? "/images/default-user.png")" alt="User" class="user-avatar">
+                    <div class="user-info">
+                        <h6 id="userName">@(ViewBag.CurrentUser?.FullName ?? "User")</h6>
+                        <p>Patient</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </header>
+
+    <!-- Content -->
+    <div class="content">
+        <!-- Doctors Grid -->
+        <div class="dashboard-grid">
+            <div class="dashboard-card span-2">
+                <div class="card-header">
+                    <h5 class="card-title">
+                        List of doctors
+                    </h5>
+                </div>
+                <div class="card-content">
+                    <div class="doctors-grid" id="doctorsGrid">
+                        @foreach (var doctor in ViewBag.Doctors as List<HealthCareSystem.Models.DoctorViewModel>)
+{
+                        <div class="doctor-card" data-specialty="@doctor.SpecialtyId">
+                            <div class="doctor-avatar">
+                                <img src="@(string.IsNullOrEmpty(doctor.AvatarUrl) ? "/images/default-doctor.png" : doctor.AvatarUrl)"
+                                     alt="@doctor.FullName" class="avatar-img">
+                            </div>
+                            <div class="doctor-info">
+                                <h6 class="doctor-name">BS. @doctor.FullName</h6>
+                                <p class="doctor-specialty">@doctor.SpecialtyName</p>
+                                @if (!string.IsNullOrEmpty(doctor.Experience))
+                                {
+                                    <p class="doctor-experience">@doctor.Experience</p>
+                                }
+                                @if (doctor.Rating.HasValue)
+                                {
+                                    <div class="doctor-rating">
+                                        <span class="rating-stars">⭐ @doctor.Rating.Value.ToString("F1")</span>
+                                    </div>
+                                }
+                            </div>
+                            <div class="doctor-actions row">
+                                <!-- Nút nhắn tin -->
+                                    <button class="btn btn-sm btn-primary col-md-6 mb-3" onclick="startConversation(@doctor.UserId)">
+                                    Nhắn tin
+                                </button>
+                                <!-- Nút đặt lịch -->
+                                    <button class="btn btn-sm btn-success col-md-6 mb-3" onclick="bookWithDoctor(@doctor.UserId)">
+                                    Đặt lịch
+                                </button>
+                            </div>
+                        </div>
+                    }
+
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h5 class="card-title">
+                        Filter by specialty
+                    </h5>
+                </div>
+                <div class="card-content">
+                    <div class="specialty-filters" id="specialtyFilters">
+                        <div class="filter-option">
+                            <input type="radio" id="all-specialties" name="specialty-filter" value="" checked>
+                            <label for="all-specialties">
+                                All specialties
+                            </label>
+                        </div>
+                        @foreach (var specialty in ViewBag.Specialties as List<HealthCareSystem.Models.SpecialtyViewModel>)
+                        {
+                            <div class="filter-option">
+                                <input type="radio" id="specialty-@specialty.SpecialtyId" name="specialty-filter" value="@specialty.SpecialtyId">
+                                <label for="specialty-@specialty.SpecialtyId">@specialty.Name</label>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('searchInput');
+        const specialtyFilters = document.querySelectorAll('input[name="specialty-filter"]');
+        const doctorCards = document.querySelectorAll('.doctor-card');
+
+        // Search functionality
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            filterDoctors();
+        });
+
+        // Specialty filter functionality
+        specialtyFilters.forEach(filter => {
+            filter.addEventListener('change', function() {
+                filterDoctors();
+            });
+        });
+
+        function filterDoctors() {
+            const searchTerm = searchInput.value.toLowerCase();
+            const selectedSpecialty = document.querySelector('input[name="specialty-filter"]:checked').value;
+
+            doctorCards.forEach(card => {
+                const doctorName = card.querySelector('.doctor-name').textContent.toLowerCase();
+                const doctorSpecialty = card.querySelector('.doctor-specialty').textContent.toLowerCase();
+                const cardSpecialtyId = card.getAttribute('data-specialty');
+
+                const matchesSearch = doctorName.includes(searchTerm) || doctorSpecialty.includes(searchTerm);
+                const matchesSpecialty = selectedSpecialty === '' || cardSpecialtyId === selectedSpecialty;
+
+                if (matchesSearch && matchesSpecialty) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+    });
+
+    function bookWithDoctor(doctorId) {
+        // Redirect to appointments page with pre-selected doctor
+        window.location.href = `/User/Appointments?doctorId=${doctorId}`;
+    }
+        async function startConversation(doctorId) {
+        const patientId = localStorage.getItem("patientId");
+
+        if (!patientId) {
+            alert("Vui lòng đăng nhập để bắt đầu cuộc trò chuyện.");
+            return;
+        }
+
+        try {
+            // Gọi API tìm và tạo cuộc trò chuyện nếu chưa có
+            const response = await fetch(`/api/ApiConversation/find-or-create?doctorId=${doctorId}`);
+
+            if (response.ok) {
+                const result = await response.json(); // Đảm bảo rằng API trả về JSON hợp lệ
+
+                if (result.success) {
+                    // Nếu đã có cuộc trò chuyện, điều hướng đến cuộc trò chuyện
+                    window.location.href = `/User/Messages?conversationId=${result.conversationId}`;
+                } else {
+                    // Nếu chưa có cuộc trò chuyện, tạo mới và điều hướng
+                    window.location.href = `/User/Messages?conversationId=${result.conversationId}`;
+                }
+            } else {
+                alert("Lỗi khi bắt đầu cuộc trò chuyện.");
+            }
+        } catch (err) {
+            console.error("Lỗi khi bắt đầu cuộc trò chuyện:", err);
+            alert("Lỗi khi bắt đầu cuộc trò chuyện. Vui lòng thử lại.");
+        }
+    }
+
+
+</script>
+
+
